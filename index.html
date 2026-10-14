@@ -387,7 +387,7 @@
         }
         function dismissSuggestion() { document.getElementById('suggestionCard').classList.add('hidden'); }
 
-        async function handleFormSubmit(e) {
+       async function handleFormSubmit(e) {
             e.preventDefault();
             const fullDate = document.getElementById('orderDate').value; 
             const record = {
@@ -399,7 +399,7 @@
                 diagnosis: document.getElementById('diagnosis').value.trim(),
                 doctorName: document.getElementById('doctorName').value.trim(),
                 orderDate: fullDate,
-                monthYear: monthYear,
+                monthYear: fullDate.substring(0, 7),
                 isUploaded: false
             };
             
@@ -412,7 +412,6 @@
             document.getElementById('orderDate').value = new Date().toISOString().slice(0, 10);
             dismissSuggestion();
         }
-
         function aggregateRecords(rawRecords) {
             const map = new Map();
             rawRecords.forEach(item => {
