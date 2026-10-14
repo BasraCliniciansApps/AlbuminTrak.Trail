@@ -101,6 +101,7 @@
                                 </div>
                                 <div class="text-slate-600 space-y-1 bg-white/70 p-2.5 rounded-lg border border-brand-100">
                                     <div><strong>الاسم:</strong> <span id="sugPatientName" class="text-slate-900 font-semibold"></span></div>
+                                    <div><strong>العمر:</strong> <span id="sugAge" class="text-slate-900 font-semibold"></span></div>
                                     <div><strong>التشخيص:</strong> <span id="sugDiagnosis" class="text-slate-900"></span></div>
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
@@ -114,6 +115,14 @@
                             <label class="block text-sm font-semibold text-slate-700 mb-1">اسم المريض الرباعي *</label>
                             <input type="text" id="patientName" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
                         </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">العمر *</label>
+                            <input type="number" id="age" min="1" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">العدد المصروف (فيال) *</label>
 
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1">العدد المصروف (فيال) *</label>
@@ -167,6 +176,7 @@
                             <tr>
                                 <th class="p-3.5 font-bold text-xs">ت</th>
                                 <th class="p-3.5 font-bold text-xs">اسم المريض</th>
+                                <th class="p-3.5 font-bold text-xs">العمر</th>
                                 <th class="p-3.5 font-bold text-xs">الرقم الإحصائي</th>
                                 <th class="p-3.5 font-bold text-xs">التشخيص</th>
                                 <th class="p-3.5 font-bold text-xs">الطبيب المعالج</th>
@@ -248,10 +258,14 @@
                     <label class="block text-xs font-semibold text-slate-700 mb-1">اسم المريض</label>
                     <input type="text" id="editPatientName" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">الرقم الإحصائي</label>
                         <input type="text" id="editRecordNumber" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">العمر</label>
+                        <input type="number" id="editAge" min="1" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">العدد (فيال)</label>
@@ -359,13 +373,16 @@
             if (found) {
                 currentSuggestionData = found;
                 document.getElementById('sugPatientName').innerText = found.patientName;
+                document.getElementById('sugAge').innerText = found.age || '';
                 document.getElementById('sugDiagnosis').innerText = found.diagnosis;
                 card.classList.remove('hidden');
             } else { card.classList.add('hidden'); currentSuggestionData = null; }
         }
+
         function applySuggestion() {
             if (currentSuggestionData) {
                 document.getElementById('patientName').value = currentSuggestionData.patientName;
+                if(currentSuggestionData.age) document.getElementById('age').value = currentSuggestionData.age;
                 document.getElementById('diagnosis').value = currentSuggestionData.diagnosis;
                 document.getElementById('doctorName').value = currentSuggestionData.doctorName;
                 dismissSuggestion();
@@ -379,12 +396,13 @@
             const record = {
                 id: Date.now().toString(),
                 patientName: document.getElementById('patientName').value.trim(),
+                age: parseInt(document.getElementById('age').value),
                 recordNumber: document.getElementById('recordNumber').value.trim(),
                 quantity: parseInt(document.getElementById('quantity').value),
                 diagnosis: document.getElementById('diagnosis').value.trim(),
                 doctorName: document.getElementById('doctorName').value.trim(),
                 orderDate: fullDate,
-                monthYear: fullDate.substring(0, 7),
+                monthYear: monthYear,
                 isUploaded: false
             };
             
@@ -406,7 +424,7 @@
                 
                 if (!map.has(key)) {
                     map.set(key, {
-                        ids: [item.id], patientName: item.patientName.trim(), recordNumber: item.recordNumber.trim(),
+                        ids: [item.id], patientName: item.patientName.trim(), age: item.age || '-', recordNumber: item.recordNumber.trim(),
                         monthYear: item.monthYear, totalQuantity: item.quantity,
                         diagnoses: [item.diagnosis.trim()], doctors: [item.doctorName.trim()], 
                         days: day ? [day] : [], rawItems: [item]
@@ -440,6 +458,7 @@
                 <tr class="${rowClass}">
                     <td class="p-3.5 text-xs text-slate-400">${i + 1}</td>
                     <td class="p-3.5 text-xs font-bold">${item.patientName}</td>
+                    <td class="p-3.5 text-xs font-bold text-center">${item.age}</td>
                     <td class="p-3.5 text-xs font-mono">${item.recordNumber}</td>
                     <td class="p-3.5 text-xs">${item.diagnoses.join(' / ')}</td>
                     <td class="p-3.5 text-xs text-brand-700">${item.doctors.join(' - ')}</td>
@@ -560,7 +579,7 @@
             const rec = getLocalRecords().find(r => r.id === id);
             if (!rec) return;
             document.getElementById('editRecordId').value = rec.id; document.getElementById('editPatientName').value = rec.patientName;
-            document.getElementById('editRecordNumber').value = rec.recordNumber; document.getElementById('editQuantity').value = rec.quantity;
+            document.getElementById('editAge').value = rec.age || ''; document.getElementById('editRecordNumber').value = rec.recordNumber; document.getElementById('editQuantity').value = rec.quantity;
             document.getElementById('editDiagnosis').value = rec.diagnosis; document.getElementById('editDoctorName').value = rec.doctorName;
             document.getElementById('editOrderDate').value = rec.orderDate; document.getElementById('editModal').classList.remove('hidden');
         }
@@ -577,6 +596,7 @@
                 
                 const newDate = document.getElementById('editOrderDate').value;
                 const newPatientName = document.getElementById('editPatientName').value.trim();
+                const newAge = parseInt(document.getElementById('editAge').value);
                 const newRecordNumber = document.getElementById('editRecordNumber').value.trim();
                 const newQuantity = parseInt(document.getElementById('editQuantity').value);
                 const newDiagnosis = document.getElementById('editDiagnosis').value.trim();
@@ -588,6 +608,7 @@
 
                 // 1. تحديث السجل المفتوح حالياً بكل التفاصيل الجديدة
                 recs[idx].patientName = newPatientName; 
+                recs[idx].age = newAge;
                 recs[idx].recordNumber = newRecordNumber;
                 recs[idx].quantity = newQuantity; 
                 recs[idx].diagnosis = newDiagnosis;
@@ -596,10 +617,11 @@
                 recs[idx].monthYear = newMonthYear;
                 updatedRecords.push(recs[idx]);
 
-                // 2. البحث عن باقي تواريخ المريض وتحديث (الاسم والرقم الإحصائي) فقط
+                // 2. البحث عن باقي تواريخ المريض وتحديث (الاسم والعمر والرقم الإحصائي)
                 recs.forEach(r => {
                     if (r.recordNumber === oldRecordNumber && r.id !== id) {
                         r.patientName = newPatientName;
+                        r.age = newAge;
                         r.recordNumber = newRecordNumber;
                         updatedRecords.push(r);
                     }
@@ -722,7 +744,7 @@
         function exportToExcel() {
             const data = aggregateRecords(getLocalRecords());
             if (!data.length) return showModal('error', 'فارغ', 'لا توجد بيانات للتصدير');
-            const rows = data.map((item, idx) => ({"ت": idx+1, "اسم المريض": item.patientName, "الرقم الإحصائي": item.recordNumber, "التشخيص": item.diagnoses.join(' / '), "الطبيب": item.doctors.join(' - '), "أيام الصرف": item.days.sort((a,b)=>a-b).join(' ، '), "العدد (فيال)": item.totalQuantity, "الشهر/السنة": item.monthYear, "موقف الرفع": item.isUploaded ? "تم الرفع" : "غير مرفوع"}));
+            const rows = data.map((item, idx) => ({"ت": idx+1, "اسم المريض": item.patientName,"العمر": item.age, "الرقم الإحصائي": item.recordNumber, "التشخيص": item.diagnoses.join(' / '), "الطبيب": item.doctors.join(' - '), "أيام الصرف": item.days.sort((a,b)=>a-b).join(' ، '), "العدد (فيال)": item.totalQuantity, "الشهر/السنة": item.monthYear, "موقف الرفع": item.isUploaded ? "تم الرفع" : "غير مرفوع"}));
             const ws = XLSX.utils.json_to_sheet(rows); ws['!dir'] = "rtl";
             const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "سجل الألبومين");
             XLSX.writeFile(wb, `AlbuminTrak_${new Date().toISOString().slice(0, 10)}.xlsx`);
