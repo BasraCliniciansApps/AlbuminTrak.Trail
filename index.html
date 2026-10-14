@@ -206,6 +206,35 @@
         </section>
     </main>
 
+    <!-- نافذة تفاصيل السجل للمريض -->
+    <div id="detailsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-100 p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-md font-bold text-slate-800">تفاصيل جرعات المريض</h3>
+                    <p id="detailsPatientName" class="text-xs text-brand-600 font-semibold mt-1"></p>
+                </div>
+                <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+            <div class="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
+                <table class="w-full text-right text-sm">
+                    <thead class="bg-slate-50 text-slate-700 sticky top-0 border-b border-slate-200">
+                        <tr>
+                            <th class="p-3 font-bold text-xs">تاريخ الصرف</th>
+                            <th class="p-3 font-bold text-xs">الكمية</th>
+                            <th class="p-3 font-bold text-xs">التشخيص</th>
+                            <th class="p-3 font-bold text-xs">الطبيب</th>
+                            <th class="p-3 font-bold text-xs text-center">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeDetailsModal()" class="px-5 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-slate-900 transition">إغلاق النافذة</button>
+            </div>
+        </div>
+    </div>
     <!-- النوافذ المنبثقة -->
     <div id="editModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-100 p-6 space-y-4">
@@ -421,8 +450,8 @@
                         ${item.isUploaded ? `<span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700">✓ تم الرفع</span>` : `<button onclick="markAsUploaded('${item.ids.join(',')}')" class="px-3 py-1.5 bg-slate-100 hover:bg-emerald-500 hover:text-white text-slate-600 font-bold text-xs rounded-lg shadow-sm transition">رفع الموقف</button>`}
                     </td>
                     <td class="p-3.5 text-center no-print">
-                        <button onclick="openEditModal('${item.rawItems[0].id}')" class="text-brand-600 mx-1 font-bold">تعديل</button>
-                        <button onclick="confirmDelete('${item.ids.join(',')}')" class="text-rose-600 mx-1 font-bold">حذف</button>
+                        <button onclick="openDetailsModal('${item.ids.join(',')}')" class="text-brand-600 mx-1 font-bold bg-brand-50 px-2.5 py-1.5 rounded-lg hover:bg-brand-100 transition shadow-sm">تفاصيل السجل</button>
+                        <button onclick="confirmSmartDelete('${item.recordNumber}', '${item.ids.join(',')}')" class="text-rose-600 mx-1 font-bold bg-rose-50 px-2.5 py-1.5 rounded-lg hover:bg-rose-100 transition shadow-sm">حذف ذكي</button>
                     </td>
                 </tr>`
             }).join('');
@@ -537,25 +566,143 @@
         }
         function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
         async function handleEditSubmit(e) {
-            e.preventDefault(); const id = document.getElementById('editRecordId').value; let recs = getLocalRecords();
+            e.preventDefault(); 
+            const id = document.getElementById('editRecordId').value; 
+            let recs = getLocalRecords();
             const idx = recs.findIndex(r => r.id === id);
+            
             if (idx !== -1) {
+                // حفظ الرقم الإحصائي القديم للبحث عن باقي سجلات المريض
+                const oldRecordNumber = recs[idx].recordNumber; 
+                
                 const newDate = document.getElementById('editOrderDate').value;
-                recs[idx].patientName = document.getElementById('editPatientName').value; recs[idx].recordNumber = document.getElementById('editRecordNumber').value;
-                recs[idx].quantity = parseInt(document.getElementById('editQuantity').value); recs[idx].diagnosis = document.getElementById('editDiagnosis').value;
-                recs[idx].doctorName = document.getElementById('editDoctorName').value; recs[idx].orderDate = newDate; recs[idx].monthYear = newDate.substring(0, 7);
+                const newPatientName = document.getElementById('editPatientName').value.trim();
+                const newRecordNumber = document.getElementById('editRecordNumber').value.trim();
+                const newQuantity = parseInt(document.getElementById('editQuantity').value);
+                const newDiagnosis = document.getElementById('editDiagnosis').value.trim();
+                const newDoctorName = document.getElementById('editDoctorName').value.trim();
+                const newMonthYear = newDate.substring(0, 7);
+
+                // مصفوفة لحفظ السجلات التي سيتم تحديثها لرفعها للسحابة لاحقاً
+                let updatedRecords = [];
+
+                // 1. تحديث السجل المفتوح حالياً بكل التفاصيل الجديدة
+                recs[idx].patientName = newPatientName; 
+                recs[idx].recordNumber = newRecordNumber;
+                recs[idx].quantity = newQuantity; 
+                recs[idx].diagnosis = newDiagnosis;
+                recs[idx].doctorName = newDoctorName; 
+                recs[idx].orderDate = newDate; 
+                recs[idx].monthYear = newMonthYear;
+                updatedRecords.push(recs[idx]);
+
+                // 2. البحث عن باقي تواريخ المريض وتحديث (الاسم والرقم الإحصائي) فقط
+                recs.forEach(r => {
+                    if (r.recordNumber === oldRecordNumber && r.id !== id) {
+                        r.patientName = newPatientName;
+                        r.recordNumber = newRecordNumber;
+                        updatedRecords.push(r);
+                    }
+                });
+                
+                // حفظ التعديلات الشاملة محلياً
                 saveLocalRecords(recs); 
-                if (isFirebaseInitialized && db) { try { await db.collection('albumin_orders').doc(id).update(recs[idx]); } catch (err) {} }
-                renderRegisterTable(); closeEditModal(); showModal('success', 'تم', 'تم حفظ التعديلات.');
+                
+                // 3. رفع التحديثات الجديدة إلى Firebase
+                if (isFirebaseInitialized && db) {
+                    updatedRecords.forEach(async (updatedRec) => {
+                        try { 
+                            await db.collection('albumin_orders').doc(updatedRec.id).update(updatedRec); 
+                        } catch (err) {}
+                    });
+                }
+
+                renderRegisterTable(); 
+                if (!document.getElementById('detailsModal').classList.contains('hidden')) { renderDetailsModal(); }
+                closeEditModal(); 
+                showModal('success', 'تحديث شامل', 'تم حفظ التعديلات وتحديث بيانات المريض في جميع تواريخه.');
             }
+        }        }
+        // --- دوال نافذة تفاصيل السجل ---
+        let currentDetailsIds = [];
+
+        function openDetailsModal(idsStr) {
+            currentDetailsIds = idsStr.split(',');
+            renderDetailsModal();
+            document.getElementById('detailsModal').classList.remove('hidden');
         }
-        function confirmDelete(idsStr) {
-            const ids = idsStr.split(',');
-            showConfirmModal('تأكيد الحذف', 'هل أنت متأكد من حذف هذا السجل نهائياً؟', () => {
-                saveLocalRecords(getLocalRecords().filter(r => !ids.includes(r.id)));
-                if (isFirebaseInitialized && db) { ids.forEach(id => { try { db.collection('albumin_orders').doc(id).delete(); } catch(err) {} }); }
-                renderRegisterTable(); showModal('success', 'تم الحذف', 'تم حذف السجل بنجاح.');
+
+        function renderDetailsModal() {
+            const records = getLocalRecords().filter(r => currentDetailsIds.includes(r.id));
+            if(records.length === 0) { closeDetailsModal(); return; }
+            
+            document.getElementById('detailsPatientName').innerText = `المريض: ${records[0].patientName} - لشهر (${records[0].monthYear})`;
+            
+            // ترتيب الجرعات حسب يوم الصرف
+            records.sort((a,b) => new Date(a.orderDate) - new Date(b.orderDate));
+            
+            document.getElementById('detailsTableBody').innerHTML = records.map(r => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-3 text-xs font-mono font-semibold">${r.orderDate}</td>
+                    <td class="p-3 text-xs font-bold text-amber-700">${r.quantity} فيال</td>
+                    <td class="p-3 text-xs max-w-xs">${r.diagnosis}</td>
+                    <td class="p-3 text-xs text-brand-700 font-semibold">${r.doctorName}</td>
+                    <td class="p-3 text-xs text-center flex justify-center gap-2">
+                        <button onclick="openEditModal('${r.id}')" class="text-brand-600 font-bold hover:underline">تعديل</button>
+                        <button onclick="confirmSingleDelete('${r.id}')" class="text-rose-600 font-bold hover:underline">حذف</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.add('hidden');
+            currentDetailsIds = [];
+        }
+
+        // --- الحذف لجرعة واحدة من داخل التفاصيل ---
+        function confirmSingleDelete(id) {
+            showConfirmModal('حذف الجرعة', 'هل أنت متأكد من حذف هذه الجرعة فقط؟', () => {
+                let recs = getLocalRecords().filter(r => r.id !== id);
+                saveLocalRecords(recs);
+                if (isFirebaseInitialized && db) { try { db.collection('albumin_orders').doc(id).delete(); } catch(err) {} }
+                
+                currentDetailsIds = currentDetailsIds.filter(i => i !== id);
+                renderRegisterTable();
+                if(currentDetailsIds.length > 0) renderDetailsModal(); else closeDetailsModal();
+                showModal('success', 'تم الحذف', 'تم حذف الجرعة المحددة بنجاح.');
             });
+        }
+
+        // --- الحذف الذكي (للمريض بالكامل أو لشهر محدد) ---
+        function confirmSmartDelete(recordNumber, monthIdsStr) {
+            document.getElementById('modalTitle').innerText = "خيارات الحذف الذكي";
+            document.getElementById('modalMessage').innerText = "هل تريد حذف السجلات الخاصة بهذا الشهر فقط، أم حذف المريض بكافة تواريخه السابقة؟";
+            const icon = document.getElementById('modalIcon'); 
+            icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-rose-100 text-rose-600"; 
+            icon.innerHTML = "⚠️";
+
+            document.getElementById('modalActions').innerHTML = `
+                <button onclick="document.getElementById('customModal').classList.add('hidden')" class="px-3 py-2 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl transition">إلغاء</button>
+                <button onclick="executeSmartDelete('${recordNumber}', false, '${monthIdsStr}')" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition shadow-sm">حذف هذا الشهر</button>
+                <button onclick="executeSmartDelete('${recordNumber}', true, '')" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition shadow-sm">حذف كل السجلات</button>
+            `;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function executeSmartDelete(recordNumber, deleteAll, monthIdsStr) {
+            document.getElementById('customModal').classList.add('hidden');
+            let recs = getLocalRecords();
+            let idsToDelete = deleteAll ? recs.filter(r => r.recordNumber === recordNumber).map(r => r.id) : monthIdsStr.split(',');
+
+            saveLocalRecords(recs.filter(r => !idsToDelete.includes(r.id)));
+
+            if (isFirebaseInitialized && db) { 
+                idsToDelete.forEach(id => { try { db.collection('albumin_orders').doc(id).delete(); } catch(err) {} }); 
+            }
+            
+            renderRegisterTable(); 
+            showModal('success', 'تم الحذف', 'تم تنفيذ عملية الحذف بنجاح.');
         }
         function showModal(type, title, msg) {
             document.getElementById('modalTitle').innerText = title; document.getElementById('modalMessage').innerText = msg;
