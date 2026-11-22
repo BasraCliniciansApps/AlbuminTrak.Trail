@@ -8,6 +8,7 @@ const path = require('path');
 const DATA_DIR = path.join(app.getPath('documents'), 'AlbuminTrak');
 const BACKUP_DIR = path.join(DATA_DIR, 'Backups');
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const BACKUP_FILES = { A: path.join(BACKUP_DIR, 'Backup_A.json'), B: path.join(BACKUP_DIR, 'Backup_B.json') };
 
 const FIRESTORE_URL =
@@ -15,6 +16,7 @@ const FIRESTORE_URL =
 const FIRESTORE_KEY = 'AIzaSyAWIfG8ZSyKdzq_BcKOAZsi-dcQ8xpQF58';
 
 let records = [];
+let settings = { hidden: { diagnosis: [], doctor: [] } };
 let mainWindow = null;
 let lastBackup = null; // { slot, time, reason, count }
 let closingDone = false;
@@ -185,8 +187,21 @@ async function fetchCloudRecords() {
 // ───────── قنوات الاتصال مع الواجهة ─────────
 let startupInfo = { restored: false };
 
+function loadSettings() {
+  const j = readJson(SETTINGS_FILE);
+  const clean = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string').slice(0, 5000) : []);
+  if (j && j.hidden) settings = { hidden: { diagnosis: clean(j.hidden.diagnosis), doctor: clean(j.hidden.doctor) } };
+}
+
+ipcMain.on('settings:save', (e, s) => {
+  if (!s || !s.hidden) return;
+  const clean = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string').slice(0, 5000) : []);
+  settings = { hidden: { diagnosis: clean(s.hidden.diagnosis), doctor: clean(s.hidden.doctor) } };
+  try { ensureDirs(); writeAtomic(SETTINGS_FILE, JSON.stringify(settings)); } catch (err) { console.error('Settings save failed:', err); }
+});
+
 ipcMain.on('data:load', (e) => {
-  e.returnValue = { records, restored: startupInfo.restored, slot: startupInfo.slot, lastBackup, dataDir: DATA_DIR };
+  e.returnValue = { settings, records, restored: startupInfo.restored, slot: startupInfo.slot, lastBackup, dataDir: DATA_DIR };
 });
 
 ipcMain.on('data:save', (e, list) => {
@@ -282,6 +297,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     startupInfo = loadData();
+    loadSettings();
     doBackup('open'); // نسخة احتياطية عند الفتح
     createWindow();
   });

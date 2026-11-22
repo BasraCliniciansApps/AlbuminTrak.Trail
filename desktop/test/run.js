@@ -81,6 +81,32 @@ app.whenReady().then(async () => {
     await shot(win, 'menu');
     await ev(win, `document.getElementById('dataMenu').classList.add('hidden'); switchTab('entry')`); await sleep(100);
 
+    out.sug = await ev(win, `(async()=>{
+      const $=id=>document.getElementById(id); const sl=ms=>new Promise(r=>setTimeout(r,ms)); const R={};
+      const press=(el,k)=>el.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true}));
+      $('patientForm').reset(); setFastDate('orderDate','2026-11-22');
+      // diagnosis: type partial -> suggestion -> Enter applies and jumps to doctor
+      $('diagnosis').focus(); $('diagnosis').value='asc'; $('diagnosis').dispatchEvent(new Event('input',{bubbles:true}));
+      R.diagItems=sugState.diagnosis.items.map(i=>i.text);
+      press($('diagnosis'),'ArrowDown'); press($('diagnosis'),'Enter'); await sl(40);
+      R.diagValue=$('diagnosis').value; R.afterDiagFocus=document.activeElement.id;
+      // doctor focus with empty value -> top list
+      $('doctorName').value=''; $('doctorName').dispatchEvent(new Event('focus'));
+      R.docTop=sugState.doctorName.items.map(i=>i.text+'x'+i.count);
+      // Enter without highlight -> default navigation (submit on last field would validate form; just check box state)
+      $('doctorName').value='د. ك'; $('doctorName').dispatchEvent(new Event('input',{bubbles:true}));
+      R.docFiltered=sugState.doctorName.items.map(i=>i.text);
+      // delete the suggestion via mouse
+      const del=document.querySelector('#sugBox_doctorName [data-del="0"]');
+      del.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true})); await sl(40);
+      R.afterDelete=sugState.doctorName.items.map(i=>i.text); R.hidden=JSON.stringify(hiddenSug);
+      // exact-match typed value shows nothing
+      $('diagnosis').value='Ascites'; $('diagnosis').dispatchEvent(new Event('input',{bubbles:true}));
+      R.exactHidden=!sugVisible(SUG_FIELDS[0]);
+      return R; })()`);
+    await sleep(300);
+    out.settingsFile = fs.existsSync(process.env.HOME + '/Documents/AlbuminTrak/settings.json') ? fs.readFileSync(process.env.HOME + '/Documents/AlbuminTrak/settings.json', 'utf8') : 'missing';
+
     // مفتاح الاستيراد السحابي: اختبار محلل Firestore
     out.parser = m.parseFirestoreDocs([{ name: 'projects/x/databases/(default)/documents/albumin_orders/abc', fields: {
       id: { stringValue: 'abc' }, patientName: { stringValue: 'اختبار' }, age: { integerValue: '33' }, recordNumber: { stringValue: '77' },
