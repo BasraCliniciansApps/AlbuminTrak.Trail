@@ -113,7 +113,8 @@
 
                         <div class="sm:col-span-2">
                             <label class="block text-sm font-semibold text-slate-700 mb-1">اسم المريض الرباعي *</label>
-                            <input type="text" id="patientName" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                            <input type="text" id="patientName" required oninput="checkNameSuggest(this.value)" autocomplete="off" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                                                    <div id="nameSuggestBox" class="hidden mt-2 p-3 bg-brand-50/90 border border-brand-200 rounded-xl text-xs space-y-2 shadow-sm"></div>
                         </div>
 
                         <div>
@@ -401,6 +402,48 @@
             }
         }
         function dismissSuggestion() { document.getElementById('suggestionCard').classList.add('hidden'); }
+        // --- اقتراح المرضى المسجلين عند كتابة الاسم ---
+        let nameSuggestions = [];
+        function normalizeArabic(t) {
+            return String(t || '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim().toLowerCase();
+        }
+        function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function checkNameSuggest(val) {
+            const box = document.getElementById('nameSuggestBox');
+            const q = normalizeArabic(val);
+            if (q.length < 2) { box.classList.add('hidden'); nameSuggestions = []; return; }
+            const words = q.split(' ');
+            const byPatient = new Map();
+            getLocalRecords().forEach(r => {
+                const n = normalizeArabic(r.patientName);
+                if (!words.every(w => n.includes(w))) return;
+                const key = `${String(r.recordNumber).trim()}_${n}`;
+                const ex = byPatient.get(key);
+                if (!ex || (r.orderDate || '') >= (ex.orderDate || '')) byPatient.set(key, r);
+            });
+            nameSuggestions = Array.from(byPatient.values()).slice(0, 5);
+            if (!nameSuggestions.length) { box.classList.add('hidden'); return; }
+            box.innerHTML = `<div class="font-bold text-brand-800">مرضى مسجلون مطابقون للاسم</div>` + nameSuggestions.map((r, i) => `
+                <div class="bg-white/70 p-2.5 rounded-lg border border-brand-100 space-y-1">
+                    <div><strong>الاسم:</strong> <span class="font-semibold text-slate-900">${escHtml(r.patientName)}</span></div>
+                    <div><strong>الرقم الإحصائي:</strong> <span class="font-mono text-slate-900">${escHtml(r.recordNumber)}</span> &nbsp; <strong>العمر:</strong> <span class="text-slate-900">${escHtml(r.age || '-')}</span></div>
+                    <div><strong>التشخيص:</strong> <span class="text-slate-900">${escHtml(r.diagnosis)}</span></div>
+                    <button type="button" onclick="applyNameSuggestion(${i})" class="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition shadow-sm">تعبئة تلقائية</button>
+                </div>`).join('') + `<button type="button" onclick="dismissNameSuggest()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg transition">تجاهل</button>`;
+            box.classList.remove('hidden');
+        }
+        function applyNameSuggestion(i) {
+            const r = nameSuggestions[i];
+            if (!r) return;
+            document.getElementById('patientName').value = r.patientName;
+            document.getElementById('recordNumber').value = r.recordNumber;
+            if (r.age) document.getElementById('age').value = r.age;
+            document.getElementById('diagnosis').value = r.diagnosis || '';
+            document.getElementById('doctorName').value = r.doctorName || '';
+            dismissNameSuggest(); dismissSuggestion();
+        }
+        function dismissNameSuggest() { document.getElementById('nameSuggestBox').classList.add('hidden'); nameSuggestions = []; }
+
 
         // --- مضاعفة صرف يوم الخميس عند الإدخال فقط ---
         function isThursday(dateStr) {
@@ -449,6 +492,7 @@
             else showModal('success', 'تم الحفظ بنجاح', 'تم تسجيل طلب صرف الألبومين بنجاح.');
             document.getElementById('patientForm').reset();
             document.getElementById('orderDate').value = new Date().toISOString().slice(0, 10);
+            dismissNameSuggest();
             document.getElementById('thursdayDouble').checked = true;
             updateThursdayBox();
             dismissSuggestion();
