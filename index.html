@@ -123,12 +123,26 @@
 
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1">العدد المصروف (فيال) *</label>
-                            <input type="number" id="quantity" min="1" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                            <input type="number" id="quantity" min="1" required oninput="updateThursdayBox()" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
                         </div>
 
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1">تاريخ الصرف *</label>
-                            <input type="date" id="orderDate" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                            <input type="date" id="orderDate" required onchange="updateThursdayBox()" oninput="updateThursdayBox()" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+
+                        <div id="thursdayBox" class="sm:col-span-2 hidden">
+                            <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50 space-y-2">
+                                <label class="flex items-center justify-between gap-3 cursor-pointer select-none">
+                                    <span class="text-sm font-bold text-amber-900">مضاعفة صرف يوم الخميس (×2)</span>
+                                    <span class="relative inline-flex items-center">
+                                        <input type="checkbox" id="thursdayDouble" checked onchange="updateThursdayBox()" class="sr-only peer">
+                                        <span class="w-11 h-6 bg-slate-300 rounded-full peer-checked:bg-amber-500 transition"></span>
+                                        <span class="absolute top-0.5 right-0.5 w-5 h-5 bg-white rounded-full shadow transition-all peer-checked:right-[22px]"></span>
+                                    </span>
+                                </label>
+                                <div id="thursdayPreview" class="text-xs font-semibold text-amber-800"></div>
+                            </div>
                         </div>
 
                         <div class="sm:col-span-2">
@@ -345,6 +359,7 @@
 
         document.getElementById('orderDate').value = new Date().toISOString().slice(0, 10);
         let currentSuggestionData = null;
+        updateThursdayBox();
 
         function switchTab(tab) {
             const tabs = ['entry', 'register', 'indications'];
@@ -387,15 +402,37 @@
         }
         function dismissSuggestion() { document.getElementById('suggestionCard').classList.add('hidden'); }
 
+        // --- مضاعفة صرف يوم الخميس عند الإدخال فقط ---
+        function isThursday(dateStr) {
+            if (!dateStr) return false;
+            const p = dateStr.split('-').map(Number);
+            return new Date(p[0], p[1] - 1, p[2]).getDay() === 4;
+        }
+        function updateThursdayBox() {
+            const box = document.getElementById('thursdayBox');
+            if (!box) return;
+            if (!isThursday(document.getElementById('orderDate').value)) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            const qty = parseInt(document.getElementById('quantity').value);
+            const on = document.getElementById('thursdayDouble').checked;
+            const prev = document.getElementById('thursdayPreview');
+            if (!qty) prev.innerText = on ? 'سيُضاعف العدد المدخل عند الحفظ.' : 'لن يُضاعف العدد المدخل عند الحفظ.';
+            else prev.innerText = on ? `سيُحفظ العدد ${qty * 2} (المدخل ${qty} × 2)` : `سيُحفظ العدد ${qty} دون مضاعفة`;
+        }
+
        async function handleFormSubmit(e) {
             e.preventDefault();
             const fullDate = document.getElementById('orderDate').value; 
+            const enteredQty = parseInt(document.getElementById('quantity').value);
+            const doubled = isThursday(fullDate) && document.getElementById('thursdayDouble').checked;
+            const finalQty = doubled ? enteredQty * 2 : enteredQty;
+            const skippedDouble = isThursday(fullDate) && !doubled;
             const record = {
                 id: Date.now().toString(),
                 patientName: document.getElementById('patientName').value.trim(),
                 age: parseInt(document.getElementById('age').value),
                 recordNumber: document.getElementById('recordNumber').value.trim(),
-                quantity: parseInt(document.getElementById('quantity').value),
+                quantity: finalQty,
                 diagnosis: document.getElementById('diagnosis').value.trim(),
                 doctorName: document.getElementById('doctorName').value.trim(),
                 orderDate: fullDate,
@@ -407,15 +444,19 @@
             if (isFirebaseInitialized && db) {
                 try { await db.collection('albumin_orders').doc(record.id).set(record); } catch (err) {}
             }
-            showModal('success', 'تم الحفظ بنجاح', 'تم تسجيل طلب صرف الألبومين بنجاح.');
+            if (doubled) showModal('success', 'تمت مضاعفة العدد', `تم حفظ الطلب، وضوعف العدد لأن يوم الصرف خميس: ${enteredQty} ← ${finalQty}`);
+            else if (skippedDouble) showModal('success', 'تم الحفظ دون مضاعفة', `تم حفظ الطلب بالعدد ${finalQty} دون مضاعفة رغم أن يوم الصرف خميس.`);
+            else showModal('success', 'تم الحفظ بنجاح', 'تم تسجيل طلب صرف الألبومين بنجاح.');
             document.getElementById('patientForm').reset();
             document.getElementById('orderDate').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('thursdayDouble').checked = true;
+            updateThursdayBox();
             dismissSuggestion();
         }
         function aggregateRecords(rawRecords) {
             const map = new Map();
             rawRecords.forEach(item => {
-                const key = `${item.recordNumber}_${item.patientName.trim()}_${item.monthYear}`;
+                const key = `${String(item.recordNumber).trim()}_${item.patientName.trim()}_${(item.orderDate || '').substring(0, 7) || item.monthYear}`;
                 const day = item.orderDate ? item.orderDate.substring(8, 10) : '';
                 
                 if (!map.has(key)) {

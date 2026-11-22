@@ -1,5 +1,5 @@
 // غيّر رقم الإصدار (v4) في كل مرة ترفع فيها تعديلاً جديداً
-const CACHE_NAME = 'albumintrak-v4';
+const CACHE_NAME = 'albumintrak-v5';
 const URLS_TO_CACHE = [
     './',
     './index.html',
