@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="0.55" stop-color="#0284c7"/>
+      <stop offset="1" stop-color="#0c4a6e"/>
+    </linearGradient>
+    <linearGradient id="liq" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#dbeafe" stop-opacity="0.9"/>
+    </linearGradient>
+    <clipPath id="body">
+      <path d="M176 196 H336 V380 A52 52 0 0 1 284 432 H228 A52 52 0 0 1 176 380 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="8" y="8" width="496" height="496" rx="110" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="4"/>
+
+  <!-- vial glass -->
+  <path d="M176 196 H336 V380 A52 52 0 0 1 284 432 H228 A52 52 0 0 1 176 380 Z" fill="url(#glass)"/>
+  <!-- albumin solution -->
+  <g clip-path="url(#body)">
+    <rect x="176" y="292" width="160" height="150" fill="url(#liq)"/>
+    <path d="M176 292 Q216 276 256 292 T336 292 V306 H176 Z" fill="#fef3c7" opacity="0.55"/>
+  </g>
+  <!-- neck + cap -->
+  <rect x="210" y="150" width="92" height="50" rx="8" fill="#e0f2fe"/>
+  <rect x="190" y="96" width="132" height="58" rx="18" fill="#0c4a6e"/>
+  <rect x="204" y="108" width="104" height="10" rx="5" fill="#ffffff" opacity="0.28"/>
+  <!-- dose ticks -->
+  <g stroke="#0369a1" stroke-width="9" stroke-linecap="round" opacity="0.85">
+    <line x1="304" y1="228" x2="326" y2="228"/>
+    <line x1="312" y1="254" x2="326" y2="254"/>
+    <line x1="304" y1="280" x2="326" y2="280"/>
+  </g>
+  <!-- glass highlight -->
+  <rect x="192" y="216" width="12" height="150" rx="6" fill="#ffffff" opacity="0.75"/>
+
+  <!-- tracking line -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="92,372 164,372 212,306 262,398 318,300 416,300" stroke="#ffffff" stroke-width="40"/>
+    <polyline points="92,372 164,372 212,306 262,398 318,300 416,300" stroke="#059669" stroke-width="22"/>
+    <polyline points="372,262 416,300 372,338" stroke="#ffffff" stroke-width="40"/>
+    <polyline points="372,262 416,300 372,338" stroke="#059669" stroke-width="22"/>
+  </g>
+</svg>

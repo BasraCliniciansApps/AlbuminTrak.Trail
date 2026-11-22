@@ -1,0 +1,56 @@
+{
+  "name": "albumintrak",
+  "version": "2.0.0",
+  "description": "AlbuminTrak - نظام إدارة وصرف الألبومين (نسخة سطح المكتب)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "css": "tailwindcss -c tailwind.config.js -i src/input.css -o src/app.css --minify",
+    "test": "xvfb-run -a electron --no-sandbox test/run.js",
+    "dist": "npm run css && electron-builder --win portable --x64"
+  },
+  "author": "Saad",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@fontsource/cairo": "^5.3.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3",
+    "tailwindcss": "3.4",
+    "xlsx": "^0.18.5"
+  },
+  "private": true,
+  "build": {
+    "appId": "com.albumintrak.desktop",
+    "productName": "AlbuminTrak",
+    "copyright": "AlbuminTrak",
+    "artifactName": "AlbuminTrak.exe",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": "false"
+    },
+    "portable": {
+      "artifactName": "AlbuminTrak.exe"
+    },
+    "afterPack": "build/afterPack.js"
+  }
+}

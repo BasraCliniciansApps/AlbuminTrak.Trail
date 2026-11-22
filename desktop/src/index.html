@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'">
+    <title>AlbuminTrak - نظام إدارة وصرف الألبومين</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="stylesheet" href="app.css">
+    <script src="vendor/xlsx.full.min.js"></script>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <img src="icon.svg" alt="AlbuminTrak" class="w-12 h-12 drop-shadow-md">
+                <div>
+                    <h1 class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">AlbuminTrak</h1>
+                    <p class="text-xs font-semibold text-slate-500">نظام إدارة وصرف الألبومين</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div id="syncStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm" title="البيانات محفوظة على هذا الحاسوب">
+                    <i class="ic" data-icon="shield"></i>
+                    <span>محفوظ على الحاسوب</span>
+                    <span id="backupInfo" class="hidden md:inline font-semibold text-emerald-600/80"></span>
+                </div>
+                <div class="relative">
+                    <button id="dataMenuBtn" type="button" onclick="toggleDataMenu(event)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white shadow-sm transition">
+                        <i class="ic" data-icon="database"></i><span>البيانات</span><i class="ic" data-icon="chevron"></i>
+                    </button>
+                    <div id="dataMenu" class="hidden absolute left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 p-1.5 z-40 text-xs">
+                        <button type="button" onclick="doImportCloud()" class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-slate-700 font-semibold text-right"><i class="ic text-brand-600" data-icon="cloud"></i><span>استيراد بياناتي من السحابة (مرة واحدة)</span></button>
+                        <button type="button" onclick="doImportFile()" class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-slate-700 font-semibold text-right"><i class="ic text-brand-600" data-icon="fileup"></i><span>استيراد من ملف JSON</span></button>
+                        <button type="button" onclick="doRestore()" class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-slate-700 font-semibold text-right"><i class="ic text-amber-600" data-icon="history"></i><span>استرجاع من أحدث نسخة احتياطية</span></button>
+                        <button type="button" onclick="doOpenFolder()" class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-slate-700 font-semibold text-right"><i class="ic text-slate-500" data-icon="folder"></i><span>فتح مجلد البيانات والنسخ</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 flex border-t border-slate-100 overflow-x-auto no-scrollbar">
+            <button id="tabEntryBtn" onclick="switchTab('entry')" class="tab-btn active py-3 px-4 sm:px-6 text-slate-600 hover:text-brand-600 transition flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="ic" data-icon="edit"></i><span>الإدخال</span>
+            </button>
+            <button id="tabRegisterBtn" onclick="switchTab('register')" class="tab-btn py-3 px-4 sm:px-6 text-slate-600 hover:text-brand-600 transition flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="ic" data-icon="table"></i><span>السجل</span>
+            </button>
+            <button id="tabIndicationsBtn" onclick="switchTab('indications')" class="tab-btn py-3 px-4 sm:px-6 text-slate-600 hover:text-brand-600 transition flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="ic" data-icon="search"></i><span>تصنيف الاستطباب</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+        <div class="print-only-header">
+            <h1 style="font-size: 20pt; font-weight: bold;">برنامج AlbuminTrak - تقرير سجل صرف الألبومين</h1>
+            <p style="font-size: 10pt; color: #444;">تاريخ الطباعة: <span id="printDate"></span></p>
+        </div>
+
+        <!-- 1. تبويب الإدخال -->
+        <section id="entryTab" class="block">
+            <div class="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+                    <h2 class="text-lg font-bold text-slate-800">إدخال طلب صرف جديد</h2>
+                    <span class="text-xs bg-brand-50 text-brand-700 px-2.5 py-1 rounded-lg font-semibold border border-brand-100">نموذج الإدخال</span>
+                </div>
+                
+                <form id="patientForm" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div class="sm:col-span-2 relative">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">الرقم الإحصائي *</label>
+                            <input type="text" id="recordNumber" required placeholder="أدخل الرقم الإحصائي..." 
+                                   oninput="checkAutoSuggest(this.value)" autocomplete="off"
+                                   class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                            
+                            <div id="suggestionCard" class="hidden mt-2 p-3.5 bg-brand-50/90 border border-brand-200 rounded-xl text-xs space-y-2 backdrop-blur-sm transition-all duration-300 shadow-sm">
+                                <div class="flex items-center justify-between font-bold text-brand-800">
+                                    <span class="flex items-center gap-1.5">
+                                        <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 10 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        سجل سابق مرتبط بهذا الرقم
+                                    </span>
+                                </div>
+                                <div class="text-slate-600 space-y-1 bg-white/70 p-2.5 rounded-lg border border-brand-100">
+                                    <div><strong>الاسم:</strong> <span id="sugPatientName" class="text-slate-900 font-semibold"></span></div>
+                                    <div><strong>العمر:</strong> <span id="sugAge" class="text-slate-900 font-semibold"></span></div>
+                                    <div><strong>التشخيص:</strong> <span id="sugDiagnosis" class="text-slate-900"></span></div>
+                                </div>
+                                <div class="flex items-center gap-2 pt-1">
+                                    <button type="button" onclick="applySuggestion()" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition shadow-sm">تعبئة تلقائية</button>
+                                    <button type="button" onclick="dismissSuggestion()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg transition">تجاهل</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">اسم المريض الرباعي *</label>
+                            <input type="text" id="patientName" required oninput="checkNameSuggest(this.value)" autocomplete="off" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                                                    <div id="nameSuggestBox" class="hidden mt-2 p-3 bg-brand-50/90 border border-brand-200 rounded-xl text-xs space-y-2 shadow-sm"></div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">العمر *</label>
+                            <input type="number" id="age" min="1" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">العدد المصروف (فيال) *</label>
+                            <input type="number" id="quantity" min="1" required oninput="updateThursdayBox()" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">تاريخ الصرف *</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="orderDateText" inputmode="numeric" autocomplete="off" placeholder="22 أو 2211 أو 22/11/26" class="ltr-num flex-1 min-w-0 px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm font-mono text-center">
+                                <button type="button" onclick="setFastDate('orderDate', dateOffset(0))" class="px-3 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-100 text-xs font-bold transition" tabindex="-1">اليوم</button>
+                                <button type="button" onclick="setFastDate('orderDate', dateOffset(-1))" class="px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition" tabindex="-1">أمس</button>
+                            </div>
+                            <input type="hidden" id="orderDate">
+                            <div id="orderDateHint" class="text-xs font-semibold mt-1 h-4"></div>
+                        </div>
+
+                        <div id="thursdayBox" class="sm:col-span-2 hidden">
+                            <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50 space-y-2">
+                                <label class="flex items-center justify-between gap-3 cursor-pointer select-none">
+                                    <span class="text-sm font-bold text-amber-900">مضاعفة صرف يوم الخميس (×2)</span>
+                                    <span class="relative inline-flex items-center">
+                                        <input type="checkbox" id="thursdayDouble" checked onchange="updateThursdayBox()" class="sr-only peer">
+                                        <span class="w-11 h-6 bg-slate-300 rounded-full peer-checked:bg-amber-500 transition"></span>
+                                        <span class="absolute top-0.5 right-0.5 w-5 h-5 bg-white rounded-full shadow transition-all peer-checked:right-[22px]"></span>
+                                    </span>
+                                </label>
+                                <div id="thursdayPreview" class="text-xs font-semibold text-amber-800"></div>
+                            </div>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">التشخيص الطبي الكامل *</label>
+                            <textarea id="diagnosis" rows="2" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm"></textarea>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">اسم الطبيب المعالج *</label>
+                            <input type="text" id="doctorName" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 px-6 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md transition transform active:scale-[0.99] flex justify-center items-center gap-2 text-sm mt-4">
+                        <i class="ic" data-icon="save"></i><span>حفظ الطلب</span>
+                    </button>
+                    <p class="text-center text-xs text-slate-400 pt-1">Enter: الحقل التالي &nbsp;|&nbsp; Ctrl + Enter: حفظ فوري &nbsp;|&nbsp; Esc: إغلاق الاقتراحات &nbsp;|&nbsp; ↑ ↓ في التاريخ: يوم واحد</p>
+                </form>
+            </div>
+        </section>
+
+        <!-- 2. تبويب السجل -->
+        <section id="registerTab" class="hidden">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 no-print">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">السجل المجمع للألبومين</h2>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        <div class="flex items-center gap-2 border border-slate-200 p-1.5 rounded-xl bg-slate-50 w-full sm:w-auto">
+                            <label class="text-xs font-semibold text-slate-600 pr-1">الشهر:</label>
+                            <input type="month" id="filterMonth" onchange="renderRegisterTable()" class="px-2.5 py-1 border border-slate-300 rounded-lg text-xs outline-none bg-white flex-1 sm:flex-none">
+                            <button onclick="clearFilter()" class="text-xs text-slate-500 hover:text-slate-800 px-1 underline">الكل</button>
+                        </div>
+                        <button onclick="exportToExcel()" class="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex-1 sm:flex-none"><i class="ic" data-icon="download"></i><span>تصدير Excel</span></button>
+                        <button onclick="triggerPrint()" class="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition flex-1 sm:flex-none"><i class="ic" data-icon="printer"></i><span>طباعة</span></button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-right text-sm min-w-[900px]">
+                        <thead class="bg-slate-50 text-slate-700 border-b border-slate-200">
+                            <tr>
+                                <th class="p-3.5 font-bold text-xs">ت</th>
+                                <th class="p-3.5 font-bold text-xs">اسم المريض</th>
+                                <th class="p-3.5 font-bold text-xs">العمر</th>
+                                <th class="p-3.5 font-bold text-xs">الرقم الإحصائي</th>
+                                <th class="p-3.5 font-bold text-xs">التشخيص</th>
+                                <th class="p-3.5 font-bold text-xs">الطبيب المعالج</th>
+                                <th class="p-3.5 font-bold text-xs text-center">أيام الصرف</th>
+                                <th class="p-3.5 font-bold text-xs">مجموع المصروف</th>
+                                <th class="p-3.5 font-bold text-xs">الشهر / السنة</th>
+                                <th class="p-3.5 font-bold text-xs text-center no-print">موقف الرفع</th>
+                                <th class="p-3.5 font-bold text-xs action-cols no-print text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="registerTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. تبويب تصنيف الاستطباب (البحث الذكي) -->
+        <section id="indicationsTab" class="hidden">
+            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80 max-w-4xl mx-auto">
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">الدليل العراقي لاستطبابات الألبومين</h2>
+                    <p class="text-sm text-slate-500 mb-6">محرك بحث ذكي يدعم الكلمات الطبية العربية والإنجليزية وتصحيح الأخطاء الإملائية البسيطة.</p>
+                    
+                    <div class="relative">
+                        <input type="text" id="searchIndication" oninput="filterSmartIndications(this.value)" placeholder="ابحث (مثال: حروق، كبد، كلى، Burns, Ascites)..." 
+                               class="w-full px-5 py-4 pl-12 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition text-sm font-mono shadow-sm" dir="rtl">
+                        <svg class="w-6 h-6 text-brand-500 absolute left-4 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <div id="indicationsResults" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    <!-- النتائج تظهر هنا -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- نافذة تفاصيل السجل للمريض -->
+    <div id="detailsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-100 p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-md font-bold text-slate-800">تفاصيل جرعات المريض</h3>
+                    <p id="detailsPatientName" class="text-xs text-brand-600 font-semibold mt-1"></p>
+                </div>
+                <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-slate-600"><i class="ic" data-icon="x"></i></button>
+            </div>
+            <div class="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
+                <table class="w-full text-right text-sm">
+                    <thead class="bg-slate-50 text-slate-700 sticky top-0 border-b border-slate-200">
+                        <tr>
+                            <th class="p-3 font-bold text-xs">تاريخ الصرف</th>
+                            <th class="p-3 font-bold text-xs">الكمية</th>
+                            <th class="p-3 font-bold text-xs">التشخيص</th>
+                            <th class="p-3 font-bold text-xs">الطبيب</th>
+                            <th class="p-3 font-bold text-xs text-center">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeDetailsModal()" class="px-5 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-slate-900 transition">إغلاق النافذة</button>
+            </div>
+        </div>
+    </div>
+    <!-- النوافذ المنبثقة -->
+    <div id="editModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-100 p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-md font-bold text-slate-800">تعديل بيانات السجل</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600"><i class="ic" data-icon="x"></i></button>
+            </div>
+            <form id="editForm" onsubmit="handleEditSubmit(event)" class="space-y-3">
+                <input type="hidden" id="editRecordId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">اسم المريض</label>
+                    <input type="text" id="editPatientName" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">الرقم الإحصائي</label>
+                        <input type="text" id="editRecordNumber" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">العمر</label>
+                        <input type="number" id="editAge" min="1" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">العدد (فيال)</label>
+                        <input type="number" id="editQuantity" min="1" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">التشخيص</label>
+                    <textarea id="editDiagnosis" rows="2" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">الطبيب</label>
+                        <input type="text" id="editDoctorName" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">تاريخ الصرف</label>
+                        <input type="text" id="editOrderDateText" inputmode="numeric" autocomplete="off" class="ltr-num w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono text-center">
+                        <input type="hidden" id="editOrderDate">
+                        <div id="editOrderDateHint" class="text-xs font-semibold mt-1 h-4"></div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl">إلغاء</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-sm">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="customModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 p-6 text-center space-y-4">
+            <div id="modalIcon" class="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-xl"></div>
+            <h3 id="modalTitle" class="text-md font-bold text-slate-800"></h3>
+            <p id="modalMessage" class="text-xs text-slate-600 leading-relaxed"></p>
+            <div id="modalActions" class="flex justify-center gap-2 pt-2"></div>
+        </div>
+    </div>
+
+    <div id="toastHost" class="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center pointer-events-none no-print"></div>
+
+    <script>
+        // ───────── أيقونات SVG (بدل الرموز التعبيرية) ─────────
+        const ICONS = {
+            edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+            table: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+            search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+            warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+            check: '<path d="M20 6 9 17l-5-5"/>',
+            checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+            alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
+            database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+            shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+            download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
+            printer: '<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+            trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+            save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
+            cloud: '<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M12 12v9M8 17l4 4 4-4"/>',
+            fileup: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M12 18v-6M9 15l3-3 3 3"/>',
+            history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/>',
+            folder: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+            chevron: '<path d="m6 9 6 6 6-6"/>',
+            x: '<path d="M18 6 6 18M6 6l12 12"/>',
+            eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+            info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>'
+        };
+        function ic(name) { return `<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg></span>`; }
+        function hydrateIcons(root) {
+            (root || document).querySelectorAll('i[data-icon]').forEach(el => {
+                el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[el.dataset.icon] || ''}</svg>`;
+                el.removeAttribute('data-icon');
+            });
+        }
+
+        // ───────── التخزين المحلي (ملف على الحاسوب عبر Electron) ─────────
+        let recordsCache = [];
+        let startInfo = { restored: false };
+
+        let currentSuggestionData = null;
+
+        function switchTab(tab) {
+            const tabs = ['entry', 'register', 'indications'];
+            tabs.forEach(t => {
+                document.getElementById(t + 'Tab').classList.add('hidden');
+                document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn').classList.remove('active');
+            });
+            document.getElementById(tab + 'Tab').classList.remove('hidden');
+            document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1) + 'Btn').classList.add('active');
+            
+            if (tab === 'entry') focusField('recordNumber');
+            if (tab === 'register') renderRegisterTable();
+            if (tab === 'indications') filterSmartIndications('');
+        }
+
+        function getLocalRecords() { return recordsCache.slice(); }
+        function saveLocalRecords(records) { recordsCache = records; window.api.save(records); }
+
+        function checkAutoSuggest(recNum) {
+            const card = document.getElementById('suggestionCard');
+            const cleanNum = recNum.trim();
+            if (cleanNum.length < 2) { card.classList.add('hidden'); currentSuggestionData = null; return; }
+            const found = getLocalRecords().slice().reverse().find(r => r.recordNumber === cleanNum);
+            if (found) {
+                currentSuggestionData = found;
+                document.getElementById('sugPatientName').innerText = found.patientName;
+                document.getElementById('sugAge').innerText = found.age || '';
+                document.getElementById('sugDiagnosis').innerText = found.diagnosis;
+                card.classList.remove('hidden');
+            } else { card.classList.add('hidden'); currentSuggestionData = null; }
+        }
+
+        function applySuggestion() {
+            if (currentSuggestionData) {
+                document.getElementById('patientName').value = currentSuggestionData.patientName;
+                if(currentSuggestionData.age) document.getElementById('age').value = currentSuggestionData.age;
+                document.getElementById('diagnosis').value = currentSuggestionData.diagnosis;
+                document.getElementById('doctorName').value = currentSuggestionData.doctorName;
+                dismissSuggestion();
+                focusField('quantity');
+            }
+        }
+        function dismissSuggestion() { document.getElementById('suggestionCard').classList.add('hidden'); }
+        // --- اقتراح المرضى المسجلين عند كتابة الاسم ---
+        let nameSuggestions = []; let nameSugIndex = -1;
+        function normName(t) {
+            return String(t || '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim().toLowerCase();
+        }
+        function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function checkNameSuggest(val) {
+            const box = document.getElementById('nameSuggestBox');
+            const q = normName(val);
+            if (q.length < 2) { box.classList.add('hidden'); nameSuggestions = []; return; }
+            const words = q.split(' ');
+            const byPatient = new Map();
+            getLocalRecords().forEach(r => {
+                const n = normName(r.patientName);
+                if (!words.every(w => n.includes(w))) return;
+                const key = `${String(r.recordNumber).trim()}_${n}`;
+                const ex = byPatient.get(key);
+                if (!ex || (r.orderDate || '') >= (ex.orderDate || '')) byPatient.set(key, r);
+            });
+            nameSuggestions = Array.from(byPatient.values()).slice(0, 5); nameSugIndex = -1;
+            if (!nameSuggestions.length) { box.classList.add('hidden'); return; }
+            box.innerHTML = `<div class="font-bold text-brand-800">مرضى مسجلون مطابقون للاسم</div>` + nameSuggestions.map((r, i) => `
+                <div data-sug="${i}" class="bg-white/70 p-2.5 rounded-lg border border-brand-100 space-y-1">
+                    <div><strong>الاسم:</strong> <span class="font-semibold text-slate-900">${escHtml(r.patientName)}</span></div>
+                    <div><strong>الرقم الإحصائي:</strong> <span class="font-mono text-slate-900">${escHtml(r.recordNumber)}</span> &nbsp; <strong>العمر:</strong> <span class="text-slate-900">${escHtml(r.age || '-')}</span></div>
+                    <div><strong>التشخيص:</strong> <span class="text-slate-900">${escHtml(r.diagnosis)}</span></div>
+                    <button type="button" onclick="applyNameSuggestion(${i})" class="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition shadow-sm">تعبئة تلقائية</button>
+                </div>`).join('') + `<button type="button" onclick="dismissNameSuggest()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg transition">تجاهل</button>`;
+            box.classList.remove('hidden');
+        }
+        function applyNameSuggestion(i) {
+            const r = nameSuggestions[i];
+            if (!r) return;
+            document.getElementById('patientName').value = r.patientName;
+            document.getElementById('recordNumber').value = r.recordNumber;
+            if (r.age) document.getElementById('age').value = r.age;
+            document.getElementById('diagnosis').value = r.diagnosis || '';
+            document.getElementById('doctorName').value = r.doctorName || '';
+            dismissNameSuggest(); dismissSuggestion();
+            focusField('quantity');
+        }
+        function dismissNameSuggest() { document.getElementById('nameSuggestBox').classList.add('hidden'); nameSuggestions = []; }
+
+
+        // --- مضاعفة صرف يوم الخميس عند الإدخال فقط ---
+        function isThursday(dateStr) {
+            if (!dateStr) return false;
+            const p = dateStr.split('-').map(Number);
+            return new Date(p[0], p[1] - 1, p[2]).getDay() === 4;
+        }
+        function updateThursdayBox() {
+            const box = document.getElementById('thursdayBox');
+            if (!box) return;
+            if (!isThursday(document.getElementById('orderDate').value)) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            const qty = parseInt(document.getElementById('quantity').value);
+            const on = document.getElementById('thursdayDouble').checked;
+            const prev = document.getElementById('thursdayPreview');
+            if (!qty) prev.innerText = on ? 'سيُضاعف العدد المدخل عند الحفظ.' : 'لن يُضاعف العدد المدخل عند الحفظ.';
+            else prev.innerText = on ? `سيُحفظ العدد ${qty * 2} (المدخل ${qty} × 2)` : `سيُحفظ العدد ${qty} دون مضاعفة`;
+        }
+
+       async function handleFormSubmit(e) {
+            e.preventDefault();
+            const fullDate = document.getElementById('orderDate').value; 
+            if (!fullDate) { document.getElementById('orderDateText').classList.add('shake'); setTimeout(() => document.getElementById('orderDateText').classList.remove('shake'), 600); focusField('orderDateText'); return; }
+            const enteredQty = parseInt(document.getElementById('quantity').value);
+            const doubled = isThursday(fullDate) && document.getElementById('thursdayDouble').checked;
+            const finalQty = doubled ? enteredQty * 2 : enteredQty;
+            const skippedDouble = isThursday(fullDate) && !doubled;
+            const record = {
+                id: Date.now().toString(),
+                patientName: document.getElementById('patientName').value.trim(),
+                age: parseInt(document.getElementById('age').value),
+                recordNumber: document.getElementById('recordNumber').value.trim(),
+                quantity: finalQty,
+                diagnosis: document.getElementById('diagnosis').value.trim(),
+                doctorName: document.getElementById('doctorName').value.trim(),
+                orderDate: fullDate,
+                monthYear: fullDate.substring(0, 7),
+                isUploaded: false
+            };
+            
+            const records = getLocalRecords(); records.push(record); saveLocalRecords(records);
+            if (doubled) toast('warn', 'تمت مضاعفة العدد (خميس)', `${enteredQty} ← ${finalQty}  |  ${record.patientName}`, 5000);
+            else if (skippedDouble) toast('info', 'تم الحفظ دون مضاعفة', `العدد ${finalQty}  |  ${record.patientName}`, 3500);
+            else toast('success', 'تم الحفظ', `${record.patientName}  |  العدد ${finalQty}`, 2200);
+            document.getElementById('patientForm').reset();
+            setFastDate('orderDate', fullDate); // نُبقي التاريخ لتسريع إدخال عدة مرضى في نفس اليوم
+            dismissNameSuggest(); dismissSuggestion();
+            document.getElementById('thursdayDouble').checked = true;
+            updateThursdayBox();
+            focusField('recordNumber');
+        }
+        function aggregateRecords(rawRecords) {
+            const map = new Map();
+            rawRecords.forEach(item => {
+                const key = `${String(item.recordNumber).trim()}_${item.patientName.trim()}_${(item.orderDate || '').substring(0, 7) || item.monthYear}`;
+                const day = item.orderDate ? item.orderDate.substring(8, 10) : '';
+                
+                if (!map.has(key)) {
+                    map.set(key, {
+                        ids: [item.id], patientName: item.patientName.trim(), age: item.age || '-', recordNumber: item.recordNumber.trim(),
+                        monthYear: item.monthYear, totalQuantity: item.quantity,
+                        diagnoses: [item.diagnosis.trim()], doctors: [item.doctorName.trim()], 
+                        days: day ? [day] : [], rawItems: [item]
+                    });
+                } else {
+                    const ex = map.get(key); ex.ids.push(item.id); ex.totalQuantity += item.quantity; ex.rawItems.push(item);
+                    if (!ex.doctors.includes(item.doctorName.trim())) ex.doctors.push(item.doctorName.trim());
+                    if (!ex.diagnoses.includes(item.diagnosis.trim())) ex.diagnoses.push(item.diagnosis.trim());
+                    if (day && !ex.days.includes(day)) ex.days.push(day); 
+                }
+            });
+            return Array.from(map.values()).map(group => {
+                group.isUploaded = group.rawItems.every(r => r.isUploaded === true);
+                return group;
+            });
+        }
+
+        function renderRegisterTable() {
+            const records = getLocalRecords();
+            const filter = document.getElementById('filterMonth').value;
+            const tb = document.getElementById('registerTableBody');
+            let data = aggregateRecords(records);
+            if (filter) data = data.filter(d => d.monthYear === filter);
+
+            if (data.length === 0) { tb.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-400">لا توجد بيانات مسجلة</td></tr>`; return; }
+
+            tb.innerHTML = data.map((item, i) => {
+                const sortedDays = item.days.sort((a,b) => parseInt(a) - parseInt(b)).join(' ، ');
+                const rowClass = item.isUploaded ? "bg-emerald-50/60 transition border-b border-slate-100" : "hover:bg-slate-50 transition border-b border-slate-100";
+                return `
+                <tr class="${rowClass}">
+                    <td class="p-3.5 text-xs text-slate-400">${i + 1}</td>
+                    <td class="p-3.5 text-xs font-bold">${item.patientName}</td>
+                    <td class="p-3.5 text-xs font-bold text-center">${item.age}</td>
+                    <td class="p-3.5 text-xs font-mono">${item.recordNumber}</td>
+                    <td class="p-3.5 text-xs">${item.diagnoses.join(' / ')}</td>
+                    <td class="p-3.5 text-xs text-brand-700">${item.doctors.join(' - ')}</td>
+                    <td class="p-3.5 text-xs text-center font-bold text-slate-600" dir="ltr">${sortedDays}</td>
+                    <td class="p-3.5"><span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">${item.totalQuantity}</span></td>
+                    <td class="p-3.5 text-xs font-mono">${item.monthYear}</td>
+                    <td class="p-3.5 text-center no-print">
+                        ${item.isUploaded ? `<span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700">${ic('check')}&nbsp;تم الرفع</span>` : `<button onclick="markAsUploaded('${item.ids.join(',')}')" class="px-3 py-1.5 bg-slate-100 hover:bg-emerald-500 hover:text-white text-slate-600 font-bold text-xs rounded-lg shadow-sm transition">رفع الموقف</button>`}
+                    </td>
+                    <td class="p-3.5 text-center no-print">
+                        <button onclick="openDetailsModal('${item.ids.join(',')}')" class="text-brand-600 mx-1 font-bold bg-brand-50 px-2.5 py-1.5 rounded-lg hover:bg-brand-100 transition shadow-sm inline-flex items-center gap-1">${ic('eye')}<span>تفاصيل السجل</span></button>
+                        <button onclick="confirmSmartDelete('${item.recordNumber}', '${item.ids.join(',')}')" class="text-rose-600 mx-1 font-bold bg-rose-50 px-2.5 py-1.5 rounded-lg hover:bg-rose-100 transition shadow-sm inline-flex items-center gap-1">${ic('trash')}<span>حذف ذكي</span></button>
+                    </td>
+                </tr>`
+            }).join('');
+        }
+
+        async function markAsUploaded(idsStr) {
+            const ids = idsStr.split(',');
+            let recs = getLocalRecords();
+            recs = recs.map(r => { if (ids.includes(r.id)) r.isUploaded = true; return r; });
+            saveLocalRecords(recs);
+            renderRegisterTable(); 
+        }
+
+        function clearFilter() { document.getElementById('filterMonth').value = ''; renderRegisterTable(); }
+
+        // --- محرك البحث الذكي (Smart Search) ---
+        // دالة لتوحيد الأحرف العربية لإلغاء تأثير الأخطاء الإملائية والهمزات
+        function normalizeArabic(text) {
+            return text.replace(/[أإآ]/g, 'ا')
+                       .replace(/ة/g, 'ه')
+                       .replace(/ي/g, 'ى')
+                       .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
+                       .toLowerCase();
+        }
+
+        // قاعدة بيانات الاستطبابات + الكلمات الدلالية (المرادفات العربية والطبية)
+        const indicationsData = [
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Large Volume Paracentesis in patients with cirrhosis and refractory ascites associated with portal hypertension (>4 L removed with documented cirrhosis)", dose: "Albumin 20%: 6-8g for every liter of ascitic fluid removed", keywords: "كبد تشمع استسقاء سحب سوائل بطن سيروسيس cirrhosis liver fluid ascites" },
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Malnutrition syndromes: (patients with diarrhea associated with enteral feeding intolerance if significant diarrhea > 2 liters per day AND Serum albumin is < 2 g/dl)", dose: "", keywords: "سوء تغذيه اسهال تغذيه دياريا diarrhea nutrition malnutrition" },
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Ascites not responsive to diuretics. (if serum albumin < 2 g/dL)", dose: "", keywords: "استسقاء مدررات سوائل البطن كبد ascites diuretics" },
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Burns: (not in the resuscitation phase in the first 24 hours after burn injuries)", dose: "", keywords: "حروق حرق نار burn burns" },
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Hyperbilirubinemia of the newborns", dose: "", keywords: "يرقان ابو صفار صفار اطفال حديثي الولاده خديج طب اطفال jaundice newborn baby" },
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Plasma exchange (with isotonic solutions)", dose: "", keywords: "تبديل بلازما تغيير بلازما غسيل دم plasma exchange" },
+            { category: "موصى به بشدة (Highly Indicated)", color: "text-emerald-700 bg-emerald-50 border-emerald-200", text: "Severe hypoalbuminaemia with low plasma volume and generalized oedema where salt and water restriction with plasma volume expansion are required", dose: "", keywords: "نقص الالبومين وذمه تورم احتباس سوائل edema swelling" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "Plasmapheresis", dose: "Based on plasma volume and serum fibrinogen level", keywords: "فصاده البلازما فصل بلازما" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "For diagnosis of Suspected HRS", dose: "Albumin: 1g/kg/day for 2 days (max 100g/day)", keywords: "متلازمه كبديه كلويه كلى كبد renal kidney liver hrs" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "Hepatorenal Syndrome (HRS), confirmed (Serum creatinine > 1.5 mg/dL in cirrhosis...)", dose: "Albumin: 25-50g/day for a total of 72 hrs", keywords: "متلازمه كبديه كلويه كلى كبد renal kidney liver hrs" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "Postoperative volume resuscitation after Cardiac Surgery, or major surgery in the liver or bowel", dose: "", keywords: "جراحه قلب عمليات كبرى امعاء قلب كبد heart bowel surgery" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "Spontaneous Bacterial Peritonitis (SBP) and cirrhosis", dose: "Albumin: 1.5 g/kg within 6-hrs (day 1), and 1g/kg on day 3", keywords: "التهاب بريتوني تسمم بكتيريا كبد infection sbp peritonitis" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "Major Hepatic Resection (>40% resected)", dose: "Albumin, 25 gm/day until albumin is >= 2.5 gm/dL", keywords: "قص كبد استئصال كبد جراحه كبد liver resection" },
+            { category: "محتمل التوصية (Likely Indicated)", color: "text-blue-700 bg-blue-50 border-blue-200", text: "Postoperative Liver Transplant", dose: "Albumin, 25 gm/day until albumin is >= 2.5 gm/dL", keywords: "زراعه كبد زرع كبد liver transplant" },
+            { category: "فائدة مشكوك فيها (Doubtful benefit)", color: "text-amber-700 bg-amber-50 border-amber-200", text: "Severe (acute) Nephrotic Syndrome", dose: "Albumin, 25 gm in combination with diuretics. Approved by nephrologist", keywords: "متلازمه كلويه كلى بروتين كليه kidney renal nephrotic" },
+            { category: "فائدة مشكوك فيها (Doubtful benefit)", color: "text-amber-700 bg-amber-50 border-amber-200", text: "Acute nephrosis/chronic glomerularnephritis and subsequent hypoalbuminemia", dose: "", keywords: "التهاب كلى كليه kidney renal nephritis" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Albuminaemia > 2.5 g/dL (with the exception of particular listed cases)", dose: "", keywords: "الالبومين طبيعي طبيعي normal" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Acute Respiratory Distress Syndrome", dose: "", keywords: "تنفس ضيق تنفس متلازمه تنفسيه ards respiratory" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Septic Shock", dose: "", keywords: "صدمه تسمميه صدمه تعفن دم septic shock" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Hypovolemic, bleeding and hemorrhagic shock (unless as second choice)", dose: "", keywords: "صدمه نزفيه نزيف فقدان دم نقص سوائل bleeding shock hemorrhagic" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Non haemorrhagic shock", dose: "", keywords: "صدمه غير نزفيه shock" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Traumatic Brain Injury", dose: "", keywords: "اصابه دماغ راس جلطه دماغيه ضربه راس brain injury trauma" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Cerebral ischaemia", dose: "", keywords: "نقص ترويه دماغيه جلطه راس cerebral ischemia" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Major Trauma", dose: "", keywords: "صدمه كبرى اصابات بليغه حوادث trauma" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Wound healing", dose: "", keywords: "شفاء جروح التئام جرح wound healing" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Hypoalbuminemia in the absence of oedema and acute hypotension", dose: "", keywords: "نقص البومين بدون وذمه او انخفاض ضغط" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Ascites responsive to diuretics", dose: "", keywords: "استسقاء يستجيب للمدررات بطن ascites" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Kidney Transplant", dose: "", keywords: "زراعه كلى زرع كلى kidney transplant" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Abdominal Compartment Syndrome", dose: "", keywords: "متلازمه الحيز البطني ضغط بطن abdominal" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Burns; in the first 24 hours after burn injuries", dose: "", keywords: "حروق اول 24 ساعه بدايه الحرق burn burns" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "The use of albumin in the immediate post-operative period is never advised for any other type of operation", dose: "", keywords: "بعد العمليه الجراحيه مباشره بوست اوبرتف post operative" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Acute normovolaemic haemodilution in surgery", dose: "", keywords: "تخفيف الدم اثناء الجراحه surgery" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Malnutrition", dose: "", keywords: "سوء تغذيه بدون اسهال تغذيه malnutrition" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Protein-losing enteropathies and malabsorption", dose: "", keywords: "سوء امتصاص فقدان بروتين امعاء malabsorption" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Acute or chronic pancreatitis", dose: "", keywords: "التهاب بنكرياس حاد او مزمن pancreatitis" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Haemodialysis with no evidence of malnutrition", dose: "", keywords: "غسيل كلى ديلزه بدون سوء تغذيه hemodialysis dialysis" },
+            { category: "غير موصى به (Not Indicated)", color: "text-rose-700 bg-rose-50 border-rose-200", text: "Ovarian hyperstimulation syndrome", dose: "", keywords: "متلازمه فرط تنبيه المبيض نسائيه ovarian" }
+        ];
+
+        function renderIndications(dataToRender) {
+            const resultsDiv = document.getElementById('indicationsResults');
+            if (dataToRender.length === 0) {
+                resultsDiv.innerHTML = `<div class="text-center py-6 text-slate-500">لا توجد نتائج مطابقة لبحثك</div>`;
+                return;
+            }
+            resultsDiv.innerHTML = dataToRender.map(item => `
+                <div class="p-4 rounded-xl border ${item.color} shadow-sm">
+                    <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-extrabold bg-white/60 mb-2 border ${item.color.split(' ')[2]}">${item.category}</span>
+                    <p class="text-sm font-semibold mb-1" dir="ltr">${item.text}</p>
+                    ${item.dose ? `<p class="text-xs mt-2 pt-2 border-t border-black/10" dir="ltr"><strong class="font-bold">Dose:</strong> ${item.dose}</p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // دالة الفلترة الذكية
+        function filterSmartIndications(query) {
+            if (!query.trim()) {
+                renderIndications(indicationsData); // عرض الكل في حال كان البحث فارغ
+                return;
+            }
+
+            const normalizedQuery = normalizeArabic(query.trim());
+            const queryWords = normalizedQuery.split(/\s+/); // تقسيم البحث إلى كلمات متفرقة
+
+            const filtered = indicationsData.filter(item => {
+                const searchableString = normalizeArabic(`${item.text} ${item.category} ${item.keywords}`);
+                // شرط الظهور: يجب أن تكون جميع كلمات البحث موجودة في الجملة الشاملة (حتى لو كانت غير متتالية)
+                return queryWords.every(word => searchableString.includes(word));
+            });
+
+            renderIndications(filtered);
+        }
+
+        // Modal Functions
+        function openEditModal(id) {
+            const rec = getLocalRecords().find(r => r.id === id);
+            if (!rec) return;
+            document.getElementById('editRecordId').value = rec.id; document.getElementById('editPatientName').value = rec.patientName;
+            document.getElementById('editAge').value = rec.age || ''; document.getElementById('editRecordNumber').value = rec.recordNumber; document.getElementById('editQuantity').value = rec.quantity;
+            document.getElementById('editDiagnosis').value = rec.diagnosis; document.getElementById('editDoctorName').value = rec.doctorName;
+            setFastDate('editOrderDate', rec.orderDate); document.getElementById('editModal').classList.remove('hidden');
+        }
+        function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+        async function handleEditSubmit(e) {
+            e.preventDefault(); 
+            const id = document.getElementById('editRecordId').value; 
+            let recs = getLocalRecords();
+            const idx = recs.findIndex(r => r.id === id);
+            
+            if (idx !== -1) {
+                // حفظ الرقم الإحصائي القديم للبحث عن باقي سجلات المريض
+                const oldRecordNumber = recs[idx].recordNumber; 
+                
+                const newDate = document.getElementById('editOrderDate').value;
+                if (!newDate) { showModal('error', 'تاريخ غير صالح', 'يرجى إدخال تاريخ صرف صحيح.'); return; }
+                const newPatientName = document.getElementById('editPatientName').value.trim();
+                const newAge = parseInt(document.getElementById('editAge').value);
+                const newRecordNumber = document.getElementById('editRecordNumber').value.trim();
+                const newQuantity = parseInt(document.getElementById('editQuantity').value);
+                const newDiagnosis = document.getElementById('editDiagnosis').value.trim();
+                const newDoctorName = document.getElementById('editDoctorName').value.trim();
+                const newMonthYear = newDate.substring(0, 7);
+
+                // مصفوفة لحفظ السجلات التي سيتم تحديثها لرفعها للسحابة لاحقاً
+                let updatedRecords = [];
+
+                // 1. تحديث السجل المفتوح حالياً بكل التفاصيل الجديدة
+                recs[idx].patientName = newPatientName; 
+                recs[idx].age = newAge;
+                recs[idx].recordNumber = newRecordNumber;
+                recs[idx].quantity = newQuantity; 
+                recs[idx].diagnosis = newDiagnosis;
+                recs[idx].doctorName = newDoctorName; 
+                recs[idx].orderDate = newDate; 
+                recs[idx].monthYear = newMonthYear;
+                updatedRecords.push(recs[idx]);
+
+                // 2. البحث عن باقي تواريخ المريض وتحديث (الاسم والعمر والرقم الإحصائي)
+                recs.forEach(r => {
+                    if (r.recordNumber === oldRecordNumber && r.id !== id) {
+                        r.patientName = newPatientName;
+                        r.age = newAge;
+                        r.recordNumber = newRecordNumber;
+                        updatedRecords.push(r);
+                    }
+                });
+                
+                // حفظ التعديلات الشاملة محلياً
+                saveLocalRecords(recs); 
+                
+                // 3. تحديث العرض
+
+                renderRegisterTable(); 
+                if (!document.getElementById('detailsModal').classList.contains('hidden')) { renderDetailsModal(); }
+                closeEditModal(); 
+                showModal('success', 'تحديث شامل', 'تم حفظ التعديلات وتحديث بيانات المريض في جميع تواريخه.');
+            }
+        }
+        // --- دوال نافذة تفاصيل السجل ---
+        let currentDetailsIds = [];
+
+        function openDetailsModal(idsStr) {
+            currentDetailsIds = idsStr.split(',');
+            renderDetailsModal();
+            document.getElementById('detailsModal').classList.remove('hidden');
+        }
+
+        function renderDetailsModal() {
+            const records = getLocalRecords().filter(r => currentDetailsIds.includes(r.id));
+            if(records.length === 0) { closeDetailsModal(); return; }
+            
+            document.getElementById('detailsPatientName').innerText = `المريض: ${records[0].patientName} - لشهر (${records[0].monthYear})`;
+            
+            // ترتيب الجرعات حسب يوم الصرف
+            records.sort((a,b) => new Date(a.orderDate) - new Date(b.orderDate));
+            
+            document.getElementById('detailsTableBody').innerHTML = records.map(r => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-3 text-xs font-mono font-semibold">${r.orderDate}</td>
+                    <td class="p-3 text-xs font-bold text-amber-700">${r.quantity} فيال</td>
+                    <td class="p-3 text-xs max-w-xs">${r.diagnosis}</td>
+                    <td class="p-3 text-xs text-brand-700 font-semibold">${r.doctorName}</td>
+                    <td class="p-3 text-xs text-center flex justify-center gap-2">
+                        <button onclick="openEditModal('${r.id}')" class="text-brand-600 font-bold hover:underline">تعديل</button>
+                        <button onclick="confirmSingleDelete('${r.id}')" class="text-rose-600 font-bold hover:underline">حذف</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.add('hidden');
+            currentDetailsIds = [];
+        }
+
+        // --- الحذف لجرعة واحدة من داخل التفاصيل ---
+        function confirmSingleDelete(id) {
+            showConfirmModal('حذف الجرعة', 'هل أنت متأكد من حذف هذه الجرعة فقط؟', () => {
+                let recs = getLocalRecords().filter(r => r.id !== id);
+                saveLocalRecords(recs);
+                
+                currentDetailsIds = currentDetailsIds.filter(i => i !== id);
+                renderRegisterTable();
+                if(currentDetailsIds.length > 0) renderDetailsModal(); else closeDetailsModal();
+                showModal('success', 'تم الحذف', 'تم حذف الجرعة المحددة بنجاح.');
+            });
+        }
+
+        // --- الحذف الذكي (للمريض بالكامل أو لشهر محدد) ---
+        function confirmSmartDelete(recordNumber, monthIdsStr) {
+            document.getElementById('modalTitle').innerText = "خيارات الحذف الذكي";
+            document.getElementById('modalMessage').innerText = "هل تريد حذف السجلات الخاصة بهذا الشهر فقط، أم حذف المريض بكافة تواريخه السابقة؟";
+            const icon = document.getElementById('modalIcon'); 
+            icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-rose-100 text-rose-600"; 
+            icon.innerHTML = ic('warn');
+
+            document.getElementById('modalActions').innerHTML = `
+                <button onclick="document.getElementById('customModal').classList.add('hidden')" class="px-3 py-2 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl transition">إلغاء</button>
+                <button onclick="executeSmartDelete('${recordNumber}', false, '${monthIdsStr}')" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition shadow-sm">حذف هذا الشهر</button>
+                <button onclick="executeSmartDelete('${recordNumber}', true, '')" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition shadow-sm">حذف كل السجلات</button>
+            `;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function executeSmartDelete(recordNumber, deleteAll, monthIdsStr) {
+            document.getElementById('customModal').classList.add('hidden');
+            let recs = getLocalRecords();
+            let idsToDelete = deleteAll ? recs.filter(r => r.recordNumber === recordNumber).map(r => r.id) : monthIdsStr.split(',');
+
+            saveLocalRecords(recs.filter(r => !idsToDelete.includes(r.id)));
+
+            
+            renderRegisterTable(); 
+            showModal('success', 'تم الحذف', 'تم تنفيذ عملية الحذف بنجاح.');
+        }
+        function showModal(type, title, msg) {
+            document.getElementById('modalTitle').innerText = title; document.getElementById('modalMessage').innerText = msg;
+            const icon = document.getElementById('modalIcon');
+            icon.className = type === 'success' ? "w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-emerald-100 text-emerald-600" : "w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-amber-100 text-amber-600";
+            icon.innerHTML = type === 'success' ? ic('check') : ic('alert');
+            document.getElementById('modalActions').innerHTML = `<button onclick="document.getElementById('customModal').classList.add('hidden')" class="px-5 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm">حسناً</button>`;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+        function showConfirmModal(title, msg, onConfirm) {
+            document.getElementById('modalTitle').innerText = title; document.getElementById('modalMessage').innerText = msg;
+            const icon = document.getElementById('modalIcon'); icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-rose-100 text-rose-600"; icon.innerHTML = ic('warn');
+            window.pendingConfirmAction = onConfirm;
+            document.getElementById('modalActions').innerHTML = `<button onclick="document.getElementById('customModal').classList.add('hidden')" class="px-4 py-2 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl">إلغاء</button><button onclick="if(window.pendingConfirmAction)window.pendingConfirmAction(); document.getElementById('customModal').classList.add('hidden')" class="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-sm">تأكيد الحذف</button>`;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+        function exportToExcel() {
+            const data = aggregateRecords(getLocalRecords());
+            if (!data.length) return showModal('error', 'فارغ', 'لا توجد بيانات للتصدير');
+            const rows = data.map((item, idx) => ({"ت": idx+1, "اسم المريض": item.patientName,"العمر": item.age, "الرقم الإحصائي": item.recordNumber, "التشخيص": item.diagnoses.join(' / '), "الطبيب": item.doctors.join(' - '), "أيام الصرف": item.days.sort((a,b)=>a-b).join(' ، '), "العدد (فيال)": item.totalQuantity, "الشهر/السنة": item.monthYear, "موقف الرفع": item.isUploaded ? "تم الرفع" : "غير مرفوع"}));
+            const ws = XLSX.utils.json_to_sheet(rows); ws['!dir'] = "rtl";
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "سجل الألبومين");
+            XLSX.writeFile(wb, `AlbuminTrak_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }
+        function triggerPrint() { document.getElementById('printDate').innerText = new Date().toLocaleDateString('ar-IQ'); window.print(); }
+
+
+        // ═════════ التاريخ السريع ═════════
+        function pad2(n) { return String(n).padStart(2, '0'); }
+        function toLatinDigits(str) {
+            return String(str || '').replace(/[٠-٩]/g, d => d.charCodeAt(0) - 0x0660).replace(/[۰-۹]/g, d => d.charCodeAt(0) - 0x06F0);
+        }
+        function validYMD(y, m, d) {
+            const dt = new Date(y, m - 1, d);
+            return y >= 2000 && y <= 2100 && dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+        }
+        function isoFromDate(dt) { return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`; }
+        function dateOffset(days, from) {
+            const base = from ? new Date(from + 'T00:00:00') : new Date();
+            base.setHours(12, 0, 0, 0);
+            base.setDate(base.getDate() + days);
+            return isoFromDate(base);
+        }
+        // صيغ مقبولة: 22 | 2211 | 22/11 | 22/11/26 | 221126 | 22112026 | 22-11-2026
+        function parseQuickDate(raw, ref) {
+            const t = toLatinDigits(raw).trim();
+            if (!t) return null;
+            const now = ref || new Date();
+            const cy = now.getFullYear(), cm = now.getMonth() + 1;
+            let d, m, y;
+            if (/\D/.test(t)) {
+                const parts = t.split(/\D+/).filter(Boolean);
+                if (!parts.length || parts.length > 3) return null;
+                d = +parts[0]; m = parts[1] !== undefined ? +parts[1] : cm; y = parts[2] !== undefined ? +parts[2] : cy;
+            } else {
+                const L = t.length;
+                if (L <= 2) { d = +t; m = cm; y = cy; }
+                else if (L === 3) { const mm = +t.slice(1); if (mm >= 1 && mm <= 12) { d = +t[0]; m = mm; } else { d = +t.slice(0, 2); m = +t[2]; } y = cy; }
+                else if (L === 4) { d = +t.slice(0, 2); m = +t.slice(2); y = cy; }
+                else if (L === 6 || L === 8) { d = +t.slice(0, 2); m = +t.slice(2, 4); y = +t.slice(4); }
+                else return null;
+            }
+            if (y < 100) y += 2000;
+            return validYMD(y, m, d) ? `${y}-${pad2(m)}-${pad2(d)}` : null;
+        }
+        function formatDisplayDate(iso) { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+        function weekdayName(iso) { return new Date(iso + 'T12:00:00').toLocaleDateString('ar-IQ', { weekday: 'long' }); }
+
+        const fastDateHooks = {};
+        function refreshFastDate(id, typing) {
+            const text = document.getElementById(id + 'Text'), hidden = document.getElementById(id), hint = document.getElementById(id + 'Hint');
+            const iso = parseQuickDate(text.value);
+            if (iso) {
+                hidden.value = iso;
+                const thu = new Date(iso + 'T12:00:00').getDay() === 4;
+                hint.className = 'text-xs font-semibold mt-1 h-4 ' + (thu ? 'text-amber-700' : 'text-slate-500');
+                hint.textContent = `${weekdayName(iso)}  ${formatDisplayDate(iso)}`;
+                text.classList.remove('border-rose-400');
+            } else {
+                hidden.value = '';
+                if (text.value.trim()) { hint.className = 'text-xs font-semibold mt-1 h-4 text-rose-600'; hint.textContent = 'تاريخ غير صالح'; text.classList.add('border-rose-400'); }
+                else { hint.textContent = ''; text.classList.remove('border-rose-400'); }
+            }
+            if (fastDateHooks[id]) fastDateHooks[id]();
+        }
+        function setFastDate(id, iso) {
+            const text = document.getElementById(id + 'Text');
+            text.value = iso ? formatDisplayDate(iso) : '';
+            refreshFastDate(id);
+        }
+        function bindFastDate(id, onChange) {
+            const text = document.getElementById(id + 'Text');
+            fastDateHooks[id] = onChange;
+            text.addEventListener('input', () => refreshFastDate(id, true));
+            text.addEventListener('focus', () => text.select());
+            text.addEventListener('blur', () => { const iso = document.getElementById(id).value; if (iso) text.value = formatDisplayDate(iso); });
+            text.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const cur = document.getElementById(id).value || dateOffset(0);
+                    setFastDate(id, dateOffset(e.key === 'ArrowUp' ? 1 : -1, cur));
+                    text.select();
+                }
+            });
+        }
+
+        // ═════════ التنقل السريع بلوحة المفاتيح ═════════
+        const ENTRY_ORDER = ['recordNumber', 'patientName', 'age', 'quantity', 'orderDateText', 'diagnosis', 'doctorName'];
+        function focusField(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            setTimeout(() => { el.focus(); if (el.select && el.tagName !== 'TEXTAREA') el.select(); }, 0);
+        }
+        function highlightNameSug(i) {
+            nameSugIndex = i;
+            document.querySelectorAll('#nameSuggestBox [data-sug]').forEach(el => {
+                const on = Number(el.dataset.sug) === i;
+                el.classList.toggle('ring-2', on); el.classList.toggle('ring-brand-500', on);
+                if (on) el.scrollIntoView({ block: 'nearest' });
+            });
+        }
+        function bindEntryKeys() {
+            const form = document.getElementById('patientForm');
+            form.addEventListener('keydown', (e) => {
+                const id = e.target.id;
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); return; }
+                if (e.key === 'Escape') { dismissSuggestion(); dismissNameSuggest(); return; }
+
+                if (id === 'patientName' && !document.getElementById('nameSuggestBox').classList.contains('hidden') && nameSuggestions.length) {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); highlightNameSug(Math.min(nameSuggestions.length - 1, nameSugIndex + 1)); return; }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); highlightNameSug(Math.max(0, nameSugIndex - 1)); return; }
+                    if (e.key === 'Enter' && nameSugIndex >= 0) { e.preventDefault(); applyNameSuggestion(nameSugIndex); return; }
+                }
+                if (e.key !== 'Enter' || !ENTRY_ORDER.includes(id)) return;
+                if (e.target.tagName === 'TEXTAREA' && e.shiftKey) return; // سطر جديد
+                e.preventDefault();
+                if (id === 'recordNumber' && currentSuggestionData && !document.getElementById('suggestionCard').classList.contains('hidden')) { applySuggestion(); return; }
+                if (id === 'orderDateText') {
+                    if (!document.getElementById('orderDate').value) { e.target.classList.add('shake'); setTimeout(() => e.target.classList.remove('shake'), 600); return; }
+                    e.target.value = formatDisplayDate(document.getElementById('orderDate').value);
+                }
+                const i = ENTRY_ORDER.indexOf(id);
+                if (i === ENTRY_ORDER.length - 1) form.requestSubmit(); else focusField(ENTRY_ORDER[i + 1]);
+            });
+        }
+
+        // ═════════ إشعارات سريعة (بدون نوافذ تعطّل الإدخال) ═════════
+        function toast(type, title, msg, ms) {
+            const host = document.getElementById('toastHost');
+            const styles = {
+                success: ['bg-emerald-600', 'checkCircle'],
+                warn: ['bg-amber-500', 'warn'],
+                info: ['bg-slate-700', 'info'],
+                error: ['bg-rose-600', 'alert']
+            }[type] || ['bg-slate-700', 'info'];
+            const el = document.createElement('div');
+            el.className = `toast-in ${styles[0]} text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 text-sm min-w-[260px] max-w-[520px]`;
+            el.innerHTML = `<span class="text-xl">${ic(styles[1])}</span><div class="text-right"><div class="font-extrabold"></div><div class="text-xs opacity-95"></div></div>`;
+            el.children[1].children[0].textContent = title;
+            el.children[1].children[1].textContent = msg || '';
+            host.appendChild(el);
+            setTimeout(() => { el.style.transition = 'opacity .25s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 260); }, ms || 2500);
+        }
+
+        // ═════════ قائمة البيانات + الاستيراد + الاسترجاع ═════════
+        function toggleDataMenu(e) { e.stopPropagation(); document.getElementById('dataMenu').classList.toggle('hidden'); }
+        document.addEventListener('click', () => document.getElementById('dataMenu').classList.add('hidden'));
+
+        function showBusy(msg) {
+            document.getElementById('modalTitle').innerText = 'يرجى الانتظار';
+            document.getElementById('modalMessage').innerText = msg;
+            const icon = document.getElementById('modalIcon');
+            icon.className = 'w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-brand-100 text-brand-600';
+            icon.innerHTML = ic('cloud');
+            document.getElementById('modalActions').innerHTML = '';
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+        function hideBusy() { document.getElementById('customModal').classList.add('hidden'); }
+        function afterDataChange() { renderRegisterTable(); }
+
+        function confirmAction(title, msg, okLabel, onOk) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = msg;
+            const icon = document.getElementById('modalIcon');
+            icon.className = 'w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-amber-100 text-amber-600';
+            icon.innerHTML = ic('warn');
+            window.pendingConfirmAction = onOk;
+            document.getElementById('modalActions').innerHTML = `<button onclick="document.getElementById('customModal').classList.add('hidden')" class="px-4 py-2 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl">إلغاء</button><button onclick="document.getElementById('customModal').classList.add('hidden'); if(window.pendingConfirmAction)window.pendingConfirmAction();" class="px-4 py-2 bg-brand-600 text-white font-bold text-xs rounded-xl shadow-sm">${okLabel}</button>`;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function reportImport(r, source) {
+            if (!r.ok) { if (!r.canceled) showModal('error', 'تعذّر الاستيراد', r.error || 'حدث خطأ غير متوقع.'); else hideBusy(); return; }
+            recordsCache = r.records;
+            afterDataChange();
+            showModal('success', 'اكتمل الاستيراد', `${source}: تم جلب ${r.fetched} سجل، أُضيف منها ${r.added} جديد، وتم تجاهل ${r.skipped} موجود مسبقاً. إجمالي السجلات الآن: ${r.total}.`);
+        }
+        function doImportCloud() {
+            document.getElementById('dataMenu').classList.add('hidden');
+            confirmAction('استيراد من السحابة', 'سيتم جلب بياناتك القديمة من السحابة مرة واحدة (يلزم اتصال بالإنترنت الآن فقط)، وتُضاف السجلات غير الموجودة دون المساس بما هو موجود. هل تريد المتابعة؟', 'استيراد', async () => {
+                showBusy('جارٍ جلب البيانات من السحابة...');
+                reportImport(await window.api.importCloud(), 'السحابة');
+            });
+        }
+        function doImportFile() {
+            document.getElementById('dataMenu').classList.add('hidden');
+            window.api.importFile().then(r => reportImport(r, 'الملف'));
+        }
+        function doRestore() {
+            document.getElementById('dataMenu').classList.add('hidden');
+            confirmAction('استرجاع من نسخة احتياطية', 'سيتم استبدال البيانات الحالية بأحدث نسخة احتياطية (A أو B). تُحفظ بياناتك الحالية في ملف data.before-restore.json داخل مجلد البرنامج. هل تريد المتابعة؟', 'استرجاع', async () => {
+                const r = await window.api.restoreBackup();
+                if (!r.ok) { showModal('error', 'تعذّر الاسترجاع', r.error); return; }
+                recordsCache = r.records; afterDataChange();
+                showModal('success', 'تم الاسترجاع', `تم استرجاع ${r.count} سجل من النسخة ${r.slot}.`);
+            });
+        }
+        function doOpenFolder() { document.getElementById('dataMenu').classList.add('hidden'); window.api.openFolder(); }
+
+        function showBackupInfo(b) {
+            if (!b) return;
+            const t = new Date(b.time).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('backupInfo').textContent = `| آخر نسخة احتياطية ${t} (${b.slot})`;
+        }
+
+        // ═════════ التهيئة ═════════
+        function initDesktop() {
+            const info = window.api.load();
+            recordsCache = info.records || [];
+            startInfo = info;
+            hydrateIcons();
+            bindFastDate('orderDate', updateThursdayBox);
+            bindFastDate('editOrderDate', null);
+            setFastDate('orderDate', dateOffset(0));
+            bindEntryKeys();
+            showBackupInfo(info.lastBackup);
+            window.api.onBackup(showBackupInfo);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') { closeEditModal(); closeDetailsModal(); document.getElementById('customModal').classList.add('hidden'); document.getElementById('dataMenu').classList.add('hidden'); }
+            });
+            if (info.restored) toast('warn', 'تمت استعادة البيانات', `كان ملف البيانات مفقوداً أو تالفاً، فاستُرجعت أحدث نسخة احتياطية (${info.slot}).`, 7000);
+            else if (!recordsCache.length) toast('info', 'لا توجد بيانات بعد', 'يمكنك استيراد بياناتك القديمة من قائمة «البيانات».', 7000);
+            focusField('recordNumber');
+        }
+
+        // عرض جميع الاستطبابات بشكل افتراضي عند الفتح
+        window.onload = () => { filterSmartIndications(''); initDesktop(); };
+    </script>
+</body>
+</html>
